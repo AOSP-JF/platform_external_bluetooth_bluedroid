@@ -47,6 +47,41 @@ static BOOLEAN l2c_link_send_to_lower (tL2C_LCB *p_lcb, BT_HDR *p_buf);
 #define L2C_LINK_SEND_BLE_ACL_DATA(x)  HCI_BLE_ACL_DATA_TO_LOWER((x))
 #endif
 
+/* Black listed car kits/headsets for role switch */
+static const UINT8 hci_role_switch_black_list_prefix[][3] = {{0x00, 0x26, 0xb4}, /* NAC FORD,2013 Lincoln */
+                                                             {0x00, 0x26, 0xe8}, /* Nissan Murano */
+                                                             {0x00, 0x37, 0x6d}, /* Lexus ES300h */
+                                                             {0x9c, 0x3a, 0xaf}  /* SAMSUNG HM1900 */
+                                                            };
+
+/*******************************************************************************
+**
+** Function         hci_blacklistted_for_role_switch
+**
+** Description      This function is called to find the blacklisted carkits
+**                  for role switch.
+**
+** Returns          TRUE, if black listed
+**
+*******************************************************************************/
+BOOLEAN hci_blacklistted_for_role_switch (BD_ADDR addr)
+{
+    int blacklistsize = 0;
+    int i =0;
+
+    blacklistsize = sizeof(hci_role_switch_black_list_prefix)/sizeof(hci_role_switch_black_list_prefix[0]);
+    for (i=0; i < blacklistsize; i++)
+    {
+        if (0 == memcmp(hci_role_switch_black_list_prefix[i], addr, 3))
+        {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+#define HI_PRI_LINK_QUOTA 2 //Mininum ACL buffer quota for high priority link
+
 /*******************************************************************************
 **
 ** Function         l2c_link_hci_conn_req
