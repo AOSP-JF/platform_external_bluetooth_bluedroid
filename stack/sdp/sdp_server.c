@@ -46,6 +46,30 @@
 #define SDP_MAX_SERVICE_RSPHDR_LEN      12
 #define SDP_MAX_SERVATTR_RSPHDR_LEN     10
 #define SDP_MAX_ATTR_RSPHDR_LEN         10
+#define AVRCP_VERSION_POSITION          7
+#define SDP_AVRCP_PROFILE_DESC_LENGTH   8
+#define AVRCP_SUPPORTED_FEATURES_POSITION 1
+#define AVRCP_BROWSE_SUPPORT_BITMASK    0x40
+
+/* Few remote device does not understand AVRCP version greater
+ * than 1.3 and falls back to 1.0, we would like to blacklist
+ * and send AVRCP versio as 1.3.
+ */
+static const UINT8 sdp_black_list_prefix[][3] = {{0x00, 0x1D, 0xBA},  /* JVC carkit */
+                                                 {0x64, 0xD4, 0xBD},  /* Honda handsfree carkit */
+                                                 {0x00, 0x06, 0xF7},  /* Denso carkit */
+                                                 {0x00, 0x1E, 0xB2},  /* AVN 3.0 Hyundai*/
+                                                 {0x00, 0x0E, 0x9F},  /* Porshe car kit */
+                                                 {0x00, 0x13, 0x7B},  /* BYOM Opel*/
+                                                 {0x68, 0x84, 0x70},  /* KIA MOTOR*/
+                                                 {0x00, 0x21, 0xCC},  /* FORD FIESTA*/
+                                                 {0x9C, 0xDF, 0x03},  /* BMW 3 Series*/
+                                                 {0x30, 0x14, 0x4A},  /* Mini Cooper*/
+                                                 {0x38, 0xC0, 0x96},  /* Seat Leon*/
+                                                 {0x00, 0x54, 0xAF},  /* Chrysler*/
+                                                 {0x04, 0x88, 0xE2},  /* BeatsStudio Wireless*/
+                                                 {0xA0, 0x14, 0x3D},  /* VW Sharen*/
+                                                 {0xE0, 0x75, 0x0A}   /* VW GOLF*/};
 
 /********************************************************************************/
 /*              L O C A L    F U N C T I O N     P R O T O T Y P E S            */
