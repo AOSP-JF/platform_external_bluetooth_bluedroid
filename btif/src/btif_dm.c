@@ -191,8 +191,27 @@ typedef struct
 #define MAX_SDP_BL_ENTRIES 3
 #define UUID_HUMAN_INTERFACE_DEVICE "00001124-0000-1000-8000-00805f9b34fb"
 
-static skip_sdp_entry_t sdp_blacklist[] = {{76}}; //Apple Mouse and Keyboard
+static skip_sdp_entry_t sdp_manufacturer_blacklist[] = {{76}}; //Apple Mouse and Keyboard
+static const UINT8 hid_sdp_addr_blacklist[][3] = {
+    {0x00, 0x07, 0x61} // Logitech
+    ,{0x00, 0x1d, 0xd8} // Microsoft Bluetooth Notebook Mouse 5000 #1
+    ,{0x7c, 0xed, 0x8d} // Microsoft Bluetooth Notebook Mouse 5000 #2
+};
 
+typedef struct hid_name_bllist
+{
+    char*  name;
+}hid_name_bllist_t;
+
+static hid_name_bllist_t hid_sdp_name_blacklist[] = {
+    {"Microsoft Bluetooth Notebook Mouse 5000"}
+};
+
+/* hid_auth_blacklist to FIX IOP issues with hid devices
+ * that dont want to have authentication during hid connection */
+static const UINT8 hid_auth_blacklist[][3] = {
+    {0x00, 0x12, 0xa1} // Targus
+};
 
 /* This flag will be true if HCI_Inquiry is in progress */
 static BOOLEAN btif_dm_inquiry_in_progress = FALSE;
@@ -438,10 +457,12 @@ BOOLEAN check_sdp_bl(const bt_bdaddr_t *remote_bdaddr)
     bt_property_t prop_name;
     bt_remote_version_t info;
     bt_status_t status;
+    bt_bdname_t bdname;
 
-
-    if (remote_bdaddr == NULL)
+    if (remote_bdaddr == NULL) {
+        APPL_TRACE_WARNING("remote_bdaddr = NULL, returning false");
         return FALSE;
+    }
 
 /* fetch additional info about remote device used in iop query */
     btm_status = BTM_ReadRemoteVersion(*(BD_ADDR*)remote_bdaddr, &lmp_ver,
@@ -457,14 +478,38 @@ BOOLEAN check_sdp_bl(const bt_bdaddr_t *remote_bdaddr)
                                               &prop_name) != BT_STATUS_SUCCESS)
     {
 
+        APPL_TRACE_WARNING("BT_PROPERTY_REMOTE_VERSION_INFO failed, returning false");
         return FALSE;
     }
     manufacturer = info.manufacturer;
 
-    for (int i = 0; i < MAX_SDP_BL_ENTRIES; i++)
+    BTIF_STORAGE_FILL_PROPERTY(&prop_name, BT_PROPERTY_BDNAME,
+                               sizeof(bt_bdname_t), &bdname);
+    if (btif_storage_get_remote_device_property((bt_bdaddr_t *)remote_bdaddr,
+                                              &prop_name) != BT_STATUS_SUCCESS)
+    {
+        APPL_TRACE_WARNING("BT_PROPERTY_BDNAME failed, returning false");
+        return FALSE;
+    }
+
+    int sdp_manufacturer_blacklist_size =
+            sizeof(sdp_manufacturer_blacklist)/sizeof(sdp_manufacturer_blacklist[0]);
+    for (int i = 0; i < sdp_manufacturer_blacklist_size; i++)
     {
         if (manufacturer == sdp_blacklist[i].manufact_id)
             return TRUE;
+    }
+
+    int sdp_name_blacklist_size =
+            sizeof(hid_sdp_name_blacklist)/sizeof(hid_name_bllist_t);
+    for (int i = 0; i < sdp_name_blacklist_size; i++)
+    {
+        if (!strncmp(hid_sdp_name_blacklist[i].name, (const char *)bdname.name,
+            strlen(hid_sdp_name_blacklist[i].name))) {
+            APPL_TRACE_WARNING("%s is in blacklist for "
+                "skipping sdp", bdname.name);
+            return TRUE;
+        }
     }
     return FALSE;
 }
