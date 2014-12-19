@@ -51,6 +51,8 @@
 #define AVRCP_SUPPORTED_FEATURES_POSITION 1
 #define AVRCP_BROWSE_SUPPORT_BITMASK    0x40
 
+#define AVRCP_13  0x03
+#define AVRCP_14  0x04
 /* Few remote device does not understand AVRCP version greater
  * than 1.3 and falls back to 1.0, we would like to blacklist
  * and send AVRCP versio as 1.3.
@@ -71,6 +73,10 @@ static const UINT8 sdp_black_list_prefix[][3] = {{0x00, 0x1D, 0xBA},  /* JVC car
                                                  {0xA0, 0x14, 0x3D},  /* VW Sharen*/
                                                  {0xE0, 0x75, 0x0A}   /* VW GOLF*/};
 
+/* Few carkits supports AVRCP1.4 but not AVRCP1.5
+*  In that case fall back to 1.4 to support browsing
+*/
+static const UINT8 sdp_dev_support_avrcp_14[][3] = {{0x00, 0x02, 0x0C} /*Clarion*/};
 /********************************************************************************/
 /*              L O C A L    F U N C T I O N     P R O T O T Y P E S            */
 /********************************************************************************/
@@ -124,6 +130,126 @@ static void process_service_search_attr_req (tCONN_CB *p_ccb, UINT16 trans_num,
 #ifndef SDP_TEXT_BAD_MAX_RECORDS_LIST
 #define SDP_TEXT_BAD_MAX_RECORDS_LIST   NULL
 #endif
+
+/****************************************************************************
+**
+** Function         sdp_dev_blacklisted_for_avrcp15
+**
+** Description      This function is called to check if Remote device
+**                  is blacklisted for Avrcp version.
+**
+** Returns          BOOLEAN
+**
+*******************************************************************************/
+BOOLEAN sdp_dev_blacklisted_for_avrcp15 (BD_ADDR addr)
+{
+    int blacklistsize = 0;
+    int i =0;
+
+    blacklistsize = sizeof(sdp_black_list_prefix)/sizeof(sdp_black_list_prefix[0]);
+    for (i=0; i < blacklistsize; i++)
+    {
+        if (0 == memcmp(sdp_black_list_prefix[i], addr, 3))
+        {
+            SDP_TRACE_ERROR("SDP Avrcp Version Black List Device");
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+/****************************************************************************
+**
+** Function         check_sdp_dev_supports_avrcp14
+**
+** Description      This function is called to check if Remote device
+**                  support Avrcp version 1.4.
+**
+** Returns          BOOLEAN
+**
+*******************************************************************************/
+BOOLEAN check_sdp_dev_supports_avrcp14 (BD_ADDR addr)
+{
+    int blacklistsize = 0;
+    int i = 0;
+
+    blacklistsize = sizeof(sdp_dev_support_avrcp_14)/sizeof(sdp_dev_support_avrcp_14[0]);
+    for (i=0; i < blacklistsize; i++)
+    {
+        if (0 == memcmp(sdp_dev_support_avrcp_14[i], addr, 3))
+        {
+            SDP_TRACE_ERROR("SDP Avrcp Version supports only 1.4");
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+/*************************************************************************************
+**
+** Function        sdp_fallback_avrcp_version
+**
+** Description     Checks if UUID is AV Remote Control, attribute id
+**                 is Profile descriptor list and remote BD address
+**                 matches device blacklist, change Avrcp version to 1.3
+**
+** Returns         BOOLEAN
+**
+***************************************************************************************/
+BOOLEAN sdp_fallback_avrcp_version (tSDP_ATTRIBUTE *p_attr, BD_ADDR remote_address)
+{
+    if ((p_attr->id == ATTR_ID_BT_PROFILE_DESC_LIST) &&
+        (p_attr->len >= SDP_AVRCP_PROFILE_DESC_LENGTH))
+    {
+        /* As per current DB implementation UUID is condidered as 16 bit */
+        if (((p_attr->value_ptr[3] << 8) | (p_attr->value_ptr[4])) ==
+                UUID_SERVCLASS_AV_REMOTE_CONTROL)
+        {
+            if (sdp_dev_blacklisted_for_avrcp15 (remote_address))
+            {
+                p_attr->value_ptr[AVRCP_VERSION_POSITION] = AVRCP_13; // Update AVRCP version as 1.3
+                SDP_TRACE_ERROR("SDP Change AVRCP Version = 0x%x",
+                         p_attr->value_ptr[AVRCP_VERSION_POSITION]);
+                return TRUE;
+            }
+            else if (check_sdp_dev_supports_avrcp14 ( remote_address))
+            {
+                p_attr->value_ptr[AVRCP_VERSION_POSITION] = AVRCP_14; // Update AVRCP version as 1.4
+                SDP_TRACE_ERROR("SDP Change AVRCP Version = 0x%x",
+                         p_attr->value_ptr[AVRCP_VERSION_POSITION]);
+               return TRUE;
+            }
+        }
+    }
+    return FALSE;
+}
+
+/*************************************************************************************
+**
+** Function        sdp_reset_avrcp_browsing_bit
+**
+** Description     Checks if Service Class ID is AV Remote Control TG, attribute id
+**                 is Supported features and remote BD address
+**                 matches device blacklist, reset Browsing Bit
+**
+** Returns         BOOLEAN
+**
+***************************************************************************************/
+BOOLEAN sdp_reset_avrcp_browsing_bit (tSDP_ATTRIBUTE attr, tSDP_ATTRIBUTE *p_attr,
+BD_ADDR                                                                      remote_address)
+{
+    if ((p_attr->id == ATTR_ID_SUPPORTED_FEATURES) && (attr.id == ATTR_ID_SERVICE_CLASS_ID_LIST) &&
+        (((attr.value_ptr[1] << 8) | (attr.value_ptr[2])) == UUID_SERVCLASS_AV_REM_CTRL_TARGET))
+    {
+        if (sdp_dev_blacklisted_for_avrcp15 (remote_address))
+        {
+            SDP_TRACE_ERROR("Reset Browse feature bitmask");
+            p_attr->value_ptr[AVRCP_SUPPORTED_FEATURES_POSITION] &= ~AVRCP_BROWSE_SUPPORT_BITMASK;
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
 
 /*******************************************************************************
 **
