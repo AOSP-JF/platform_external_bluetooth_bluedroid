@@ -213,7 +213,14 @@ static UINT32 a2dp_media_task_stack[(A2DP_MEDIA_TASK_STACK_SIZE + 3) / 4];
 #define MAX_OUTPUT_A2DP_QUEUE_MS 360
 
 #ifndef MAX_PCM_FRAME_NUM_PER_TICK
-#define MAX_PCM_FRAME_NUM_PER_TICK     14
+#ifdef SAMPLE_RATE_48K
+/* If a frame is 512 bytes and a tick is 3840 bytes (48K) then allow up to
+ * two full ticks to be sent per tick which is 9680 / 512 = 18
+ */
+#define MAX_PCM_FRAME_NUM_PER_TICK 18
+#else
+#define MAX_PCM_FRAME_NUM_PER_TICK 14
+#endif
 #endif
 
 //#define BTIF_MEDIA_VERBOSE_ENABLED
