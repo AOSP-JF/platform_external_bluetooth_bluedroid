@@ -496,8 +496,26 @@ BOOLEAN check_sdp_bl(const bt_bdaddr_t *remote_bdaddr)
             sizeof(sdp_manufacturer_blacklist)/sizeof(sdp_manufacturer_blacklist[0]);
     for (int i = 0; i < sdp_manufacturer_blacklist_size; i++)
     {
-        if (manufacturer == sdp_blacklist[i].manufact_id)
+        if (manufacturer == sdp_manufacturer_blacklist[i].manufact_id)
+        {
+            APPL_TRACE_WARNING("device is in blacklist for skipping sdp");
             return TRUE;
+        }
+    }
+    int sdp_addr_blacklist_size =
+            sizeof(hid_sdp_addr_blacklist)/sizeof(hid_sdp_addr_blacklist[0]);
+    for (int i = 0; i < sdp_addr_blacklist_size; i++)
+    {
+        if (hid_sdp_addr_blacklist[i][0] == (*(BD_ADDR*)remote_bdaddr)[0] &&
+            hid_sdp_addr_blacklist[i][1] == (*(BD_ADDR*)remote_bdaddr)[1] &&
+            hid_sdp_addr_blacklist[i][2] == (*(BD_ADDR*)remote_bdaddr)[2]) {
+            APPL_TRACE_WARNING("%02x:%02x:%02x:%02x:%02x:%02x is in blacklist for "
+                "skipping sdp", (*(BD_ADDR*)remote_bdaddr)[0],
+                (*(BD_ADDR*)remote_bdaddr)[1], (*(BD_ADDR*)remote_bdaddr)[2],
+                (*(BD_ADDR*)remote_bdaddr)[3], (*(BD_ADDR*)remote_bdaddr)[4],
+                (*(BD_ADDR*)remote_bdaddr)[5]);
+            return TRUE;
+        }
     }
 
     int sdp_name_blacklist_size =
